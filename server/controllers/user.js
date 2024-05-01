@@ -141,6 +141,28 @@ async function getEmployeesEntry (req, res){
     }
 }
 
+async function handleLogin (req, res){
+    try{
+        const {email, password} = req.body
+        if(!email || !password){
+            return res.json({success : false, msg : 'fill all fields'})
+        }
+        const findEmployeeQuary = `select * from employeesInfo where email = '${email}'` 
+        const findEmployeeData = await request.query(findEmployeeQuary);
+        if(findEmployeeData.recordset.length === 0){
+            return res.json({success : false, msg : 'invelid credentials'})
+        }
+        const checkPassword = bcrypt.compareSync(password, findEmployeeData.recordset[0].password)
+        if(checkPassword === false){
+            return res.json({success : false, msg : 'invelid credentials'})
+        }
+        return res.json({success : true, msg : 'employee is authenticated'})
+    }catch (error){
+        console.log('error :', error);
+        return res.json({success : false , msg : 'system error'})
+    }
+}
+
 module.exports = {
     check,
     CreateEmployee,
@@ -148,4 +170,5 @@ module.exports = {
     employeeExit,
     filterEmployeesInfo,
     getEmployeesEntry,
+    handleLogin,
 }
