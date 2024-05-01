@@ -1,5 +1,6 @@
 const sql = require('mssql/msnodesqlv8');
-const hwt = require('jsonwebtoken')
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const { DB_connection } = require('../DB_connect');
 const { response } = require('express');
 DB_connection()
@@ -13,8 +14,9 @@ function check (req, res){
 
 async function CreateEmployee(req, res) {
     try {
-        const { firstName, lastName, email, gender } = req.body;
-        if (!firstName || !lastName || !email || !gender) {
+        const { firstName, lastName, email, gender, password } = req.body;
+        if (!firstName || !lastName || !email || !gender || !password) {
+            console.log(req.body);
             return res.json({ success: false, msg: "Missing required fields" });
         }
         if (gender !== 'male' && gender !== 'female' && gender !== 'other') {
@@ -28,10 +30,17 @@ async function CreateEmployee(req, res) {
         }
         const currentDate = new Date();
         const formattedDate = currentDate.toISOString().replace('T', ' ').replace('Z', '');
-        const insertQuery = `INSERT INTO employeesInfo (firstName, lastName, email, gender, createTime) VALUES ('${firstName}', '${lastName}', '${email}', '${gender}','${formattedDate}')`;
+        const hashPassword = await bcrypt.hashSync(password, 10);
+        console.log('password :', hashPassword);
+        const insertQuery = `INSERT INTO employeesInfo (firstName, lastName, email, gender, createTime, password) OUTPUT inserted.id VALUES ('${firstName}', '${lastName}', '${email}', '${gender}','${formattedDate}', '${hashPassword}')`;
         const insertResult = await request.query(insertQuery);
-        console.log(insertResult);
-        return res.json({ success: true });
+        const generatedID = insertResult.recordset[0].id;
+        const secret = 'wertyjkgmhnfgshfggyhgtyhgr435yw56457u'
+        const token =  await jwt.sign({
+            id : generatedID,
+            email : email
+        }, secret, {expiresIn : 60 * 1})
+        return res.json({ success: true , token : token});
     } catch (error) {
         console.log("Create employee error:", error);
         return res.json({ success: false, msg: "Internal server error" });
@@ -113,10 +122,30 @@ async function filterEmployeesInfo(req, res){
     }
 }
 
+async function getEmployeesEntry (req, res){
+    try{
+        const {id} = req.body
+        if(!id){
+            return res.json({success : false, msg : 'please enter ID, can not get value without ID'})
+        }
+        const Quary = `select * from employees_Entry_exit where employeeID = ${id}`
+        const employeeData = await request.query(Quary);
+        if(employeeData.recordset.length === 0){
+            res.json({success : false, msg : 'employee does not have any data'})
+        }
+        const responseData = employeeData.recordsets
+        return res.json({success : true, employeeData : responseData})
+    }catch(error){
+        console.log('employee entry error :', error);
+        res.json({success : false, msg : 'system error'})
+    }
+}
+
 module.exports = {
     check,
     CreateEmployee,
     employeeEntry,
     employeeExit,
-    filterEmployeesInfo
+    filterEmployeesInfo,
+    getEmployeesEntry,
 }

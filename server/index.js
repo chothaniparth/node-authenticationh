@@ -1,5 +1,7 @@
 const express = require('express')
 const cors = require('cors')
+const cookieParser = require('cookie-parser')
+const expressSession = require('express-session')
 const cluster = require('cluster')
 const os = require('os')
 const userRouter = require('./routers/user')
@@ -23,6 +25,8 @@ if (cluster.isMaster) {
     app.use(cors())
     app.use(express.json())
     app.use(express.urlencoded({extended: false}))
+    app.use(cookieParser())
+    // app.use(expressSession())
     app.use('/', userRouter)
 
     const PORT = process.env.PORT || 8000;
