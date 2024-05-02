@@ -6,7 +6,8 @@ const {
     employeeExit, 
     filterEmployeesInfo, 
     getEmployeesEntry,
-    handleLogin
+    handleLogin,
+    verifyToken
 } = require('../controllers/user')
 const router = express.Router()
 
@@ -17,5 +18,6 @@ router.post('/punchout', employeeExit)
 router.post('/filter', filterEmployeesInfo)
 router.post('/getEmployeeEntry', getEmployeesEntry)
 router.post('/login', handleLogin)
+router.post('/verifyToken',verifyToken)
 
 module.exports = router;

@@ -6,6 +6,7 @@ const { response } = require('express');
 DB_connection()
 
 const request = new sql.Request();
+const secret = 'wertyjkgmhnfgshfggyhgtyhgr435yw56457u'
 
 function check (req, res){
     console.log('server workking');
@@ -35,11 +36,10 @@ async function CreateEmployee(req, res) {
         const insertQuery = `INSERT INTO employeesInfo (firstName, lastName, email, gender, createTime, password) OUTPUT inserted.id VALUES ('${firstName}', '${lastName}', '${email}', '${gender}','${formattedDate}', '${hashPassword}')`;
         const insertResult = await request.query(insertQuery);
         const generatedID = insertResult.recordset[0].id;
-        const secret = 'wertyjkgmhnfgshfggyhgtyhgr435yw56457u'
         const token =  await jwt.sign({
             id : generatedID,
             email : email
-        }, secret, {expiresIn : 60 * 1})
+        }, secret, {expiresIn : '60s'})
         return res.json({ success: true , token : token});
     } catch (error) {
         console.log("Create employee error:", error);
@@ -47,7 +47,7 @@ async function CreateEmployee(req, res) {
     }
 }
 
-async function employeeEntry(req, res){
+async function employeeEntry(req, res){ 
     try {
         const {id} = req.body;
         if (!id) {
@@ -156,12 +156,37 @@ async function handleLogin (req, res){
         if(checkPassword === false){
             return res.json({success : false, msg : 'invelid credentials'})
         }
-        return res.json({success : true, msg : 'employee is authenticated'})
+        const generatedID = findEmployeeData.recordset[0].id;
+        const token =  await jwt.sign({
+            id : generatedID,
+            email : email
+        }, secret, {expiresIn : '60s'})
+        console.log('id : ' + generatedID , 'token : '+ token);
+        return res.json({success : true, msg : 'employee is authenticated', token : token})
     }catch (error){
         console.log('error :', error);
         return res.json({success : false , msg : 'system error'})
     }
 }
+
+async function verifyToken  (req, res) {
+    try {
+        const token = req.headers.authorization;
+        if (!token) {
+            return res.send("A token is required for authentication");
+        }
+        const decoded = await jwt.verify(token, secret)
+        const newID = decoded.id, newEmail = decoded.email   
+
+        const newToken =  await jwt.sign({
+            id : newID,
+            email : newEmail
+        }, secret, {expiresIn : '60s'})
+        return res.json({success : true, token : newToken})
+    } catch (error) {
+        return res.status(401).json({success : false, msg : "Invalid Token"});
+    }
+};
 
 module.exports = {
     check,
@@ -171,4 +196,5 @@ module.exports = {
     filterEmployeesInfo,
     getEmployeesEntry,
     handleLogin,
+    verifyToken
 }
