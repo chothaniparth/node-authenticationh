@@ -160,7 +160,7 @@ async function handleLogin (req, res){
         const token =  await jwt.sign({
             id : generatedID,
             email : email
-        }, secret, {expiresIn : '60s'})
+        }, secret, {expiresIn : '24h'})
         console.log('id : ' + generatedID , 'token : '+ token);
         return res.json({success : true, msg : 'employee is authenticated', token : token})
     }catch (error){
@@ -181,12 +181,56 @@ async function verifyToken  (req, res) {
         const newToken =  await jwt.sign({
             id : newID,
             email : newEmail
-        }, secret, {expiresIn : '60s'})
-        return res.json({success : true, token : newToken})
+        }, secret, {expiresIn : '24h'})
+        return res.json({success : true})
     } catch (error) {
         return res.status(401).json({success : false, msg : "Invalid Token"});
     }
 };
+
+async function addProducts(req, res) {
+    try{
+        const {productName, productDetails, productPrice} = req.body;
+        const token = req.headers.authorization;
+        const tokenData = jwt.verify(token, secret);
+        const productOwnerID = tokenData.id
+        if(!productOwnerID){
+            return res.json({success : false, msg : 'productID is required'})
+        }
+        if(!productName || !productDetails || !productPrice){
+            return res.json({success : false, msg : 'please enter all product details.'})
+        }
+        console.log('owner ID :', productDetails);
+
+        const insertProductQuary = `insert into products (productOwnerID, productName, productDetails, productPrice) values (${productOwnerID}, '${productName}', '${productDetails}', ${productPrice})`;
+        // const insertValues = [productOwnerID ,productName, productDetails, productPrice]
+        const insertProduct = await request.query(insertProductQuary);
+        console.log(insertProduct);
+        return res.json({success : true})
+    }catch (error){
+        console.log('add product error :', error);
+        return res.json({success : false, msg : 'system error, please try later.'})
+    }
+}
+
+async function getProducts (req, res){
+    try{
+        const token = req.headers.authorization;
+        const tokenData = jwt.verify(token, secret);
+        const id = tokenData.id;
+        if(!id){
+            return res.json({success : false, msg : 'user ID is required'});
+        }
+        const getProductsQuary = `select * from products where productOwnerID = ${id}`
+        const response = await request.query(getProductsQuary);
+        const responseData = response.recordset
+        console.log('get response :', responseData);
+        return res.json({success : true, data : responseData});
+    }catch (error){
+        console.log("get product error :", error);
+        return res.json({success : false})
+    }
+}
 
 module.exports = {
     check,
@@ -196,5 +240,7 @@ module.exports = {
     filterEmployeesInfo,
     getEmployeesEntry,
     handleLogin,
-    verifyToken
+    verifyToken,
+    addProducts,
+    getProducts
 }
