@@ -9,7 +9,6 @@ const request = new sql.Request();
 const secret = 'wertyjkgmhnfgshfggyhgtyhgr435yw56457u'
 
 function check (req, res){
-    console.log('server workking');
     res.json({success : true})
 }
 
@@ -17,7 +16,6 @@ async function CreateEmployee(req, res) {
     try {
         const { firstName, lastName, email, gender, password } = req.body;
         if (!firstName || !lastName || !email || !gender || !password) {
-            console.log(req.body);
             return res.json({ success: false, msg: "Missing required fields" });
         }
         if (gender !== 'male' && gender !== 'female' && gender !== 'other') {
@@ -26,13 +24,11 @@ async function CreateEmployee(req, res) {
         const emailExistsQuery = `SELECT COUNT(*) AS count FROM employeesInfo WHERE email = '${email}'`;
         const emailExistsResult = await request.query(emailExistsQuery);
         if (emailExistsResult.recordset[0].count > 0) {
-            console.log(emailExistsResult);
             return res.json({ success: false, msg: "Email already exists" });
         }
         const currentDate = new Date();
         const formattedDate = currentDate.toISOString().replace('T', ' ').replace('Z', '');
         const hashPassword = await bcrypt.hashSync(password, 10);
-        console.log('password :', hashPassword);
         const insertQuery = `INSERT INTO employeesInfo (firstName, lastName, email, gender, createTime, password) OUTPUT inserted.id VALUES ('${firstName}', '${lastName}', '${email}', '${gender}','${formattedDate}', '${hashPassword}')`;
         const insertResult = await request.query(insertQuery);
         const generatedID = insertResult.recordset[0].id;
@@ -71,7 +67,6 @@ async function employeeEntry(req, res){
         const formattedDate = currentDate.toISOString().replace('T', ' ').replace('Z', '');
         const query = `INSERT INTO employees_Entry_exit (employeeID, employeeEntry) VALUES (${id}, '${formattedDate}')`;
         const response = await request.query(query);
-        // console.log(response);
         res.json({success: true});
     } catch (error) {
         console.error('Error in employeeEntry API:', error);
@@ -88,7 +83,6 @@ async function employeeExit(req, res) {
         if (findIdData.recordset.length === 0) {
             return res.json({ success: false, message: 'Employee record not found' });
         }
-        console.log(findIdData.recordset);
         if(findIdData.recordset[findIdData.recordset.length - 1].employeeExit != null){
             return res.json({success : false, message : 'make new entry you can not do exit.'});
         }
@@ -100,7 +94,6 @@ async function employeeExit(req, res) {
         const updateQuary = `UPDATE employees_Entry_exit SET employeeExit = '${formattedDate}' WHERE srID = ${lastIEntry}`;
         const exitResponse = await request.query(updateQuary);
 
-        console.log('Employee exit record updated successfully :', exitResponse);
         res.json({ success: true });
     } catch (error) {
         console.log('Error in employee exit API:', error);
@@ -150,41 +143,52 @@ async function handleLogin (req, res){
         const findEmployeeQuary = `select * from employeesInfo where email = '${email}'` 
         const findEmployeeData = await request.query(findEmployeeQuary);
         if(findEmployeeData.recordset.length === 0){
-            return res.json({success : false, msg : 'invelid credentials'})
+            return res.json({success : false, msg : 'invalid credentials'})
         }
         const checkPassword = bcrypt.compareSync(password, findEmployeeData.recordset[0].password)
         if(checkPassword === false){
-            return res.json({success : false, msg : 'invelid credentials'})
+            return res.json({success : false, msg : 'invalid credentials'})
         }
         const generatedID = findEmployeeData.recordset[0].id;
         const token =  await jwt.sign({
             id : generatedID,
             email : email
-        }, secret, {expiresIn : '24h'})
-        console.log('id : ' + generatedID , 'token : '+ token);
-        return res.json({success : true, msg : 'employee is authenticated', token : token})
+        }, secret, {expiresIn : '100s'}) // Set session duration to 100 seconds
+
+        res.cookie('token', token, { maxAge: 100000, httpOnly: true }); // 100 seconds in milliseconds
+        return res.json({success : true})
     }catch (error){
         console.log('error :', error);
         return res.json({success : false , msg : 'system error'})
     }
 }
 
-async function verifyToken  (req, res) {
+async function verifyToken(req, res) {
     try {
-        const token = req.headers.authorization;
-        if (!token) {
+        const cookie = req.cookies.token;
+        if (!cookie) {
             return res.send("A token is required for authentication");
         }
-        const decoded = await jwt.verify(token, secret)
-        const newID = decoded.id, newEmail = decoded.email   
+        
+        // Remove any prefix from the cookie value
+        const token = cookie.replace('token=', '');
+        console.log(token);
+        const decoded = jwt.verify(token, secret);
+        const { id: newID, email: newEmail } = decoded;
 
-        const newToken =  await jwt.sign({
-            id : newID,
-            email : newEmail
-        }, secret, {expiresIn : '24h'})
-        return res.json({success : true})
+        const expirationTimestamp = decoded.exp;
+        const currentTimestamp = Math.floor(Date.now() / 1000); // Current time in seconds
+        const threshold = 30; // 30 seconds threshold for refreshing the token
+
+        if (expirationTimestamp - currentTimestamp < threshold) {
+            const newToken = jwt.sign({ id: newID, email: newEmail }, secret, { expiresIn: '100s' }); // Expires in 100 seconds
+            res.cookie('token', newToken, { maxAge: 100000, httpOnly: true }); // Set the new token as a cookie (100 seconds)
+            return res.json({ success: true, newToken });
+        }
+
+        return res.json({ success: true, tokenData: decoded });
     } catch (error) {
-        return res.status(401).json({success : false, msg : "Invalid Token"});
+        return res.status(401).json({ success: false, msg: "Invalid Token" });
     }
 };
 
@@ -242,5 +246,5 @@ module.exports = {
     handleLogin,
     verifyToken,
     addProducts,
-    getProducts
+    getProducts,
 }

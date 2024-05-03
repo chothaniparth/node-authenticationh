@@ -9,7 +9,7 @@ const {
     handleLogin,
     verifyToken,
     addProducts,
-    getProducts
+    getProducts,
 } = require('../controllers/user')
 const router = express.Router()
 
