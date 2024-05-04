@@ -1,6 +1,7 @@
 const sql = require('mssql/msnodesqlv8');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const uuid = require('uuid')
 const { DB_connection } = require('../DB_connect');
 const { response } = require('express');
 DB_connection()
@@ -133,10 +134,10 @@ async function getEmployeesEntry (req, res){
         res.json({success : false, msg : 'system error'})
     }
 }
-
+// ########################################################################################################################################################################################################################################################################################################################################################################
 async function handleLogin (req, res){
     try{
-        const {email, password} = req.body
+        const {email, password} = req.params
         if(!email || !password){
             return res.json({success : false, msg : 'fill all fields'})
         }
@@ -153,10 +154,11 @@ async function handleLogin (req, res){
         const token =  await jwt.sign({
             id : generatedID,
             email : email
-        }, secret, {expiresIn : '100s'}) // Set session duration to 100 seconds
+        }, secret, {expiresIn : '15s'}) // Set session duration to 100 seconds
 
-        res.cookie('token', token, { maxAge: 100000, httpOnly: true }); // 100 seconds in milliseconds
-        return res.json({success : true})
+        const expirationTime = new Date(Date.now() + 25000); // 10 seconds from now
+        res.cookie('token', token, { expires: expirationTime, httpOnly: true });
+                return res.json({success : true, token})
     }catch (error){
         console.log('error :', error);
         return res.json({success : false , msg : 'system error'})
@@ -169,20 +171,20 @@ async function verifyToken(req, res) {
         if (!cookie) {
             return res.send("A token is required for authentication");
         }
-        
+        // console.log(req);
         // Remove any prefix from the cookie value
         const token = cookie.replace('token=', '');
-        console.log(token);
+        console.log("verify",token);
         const decoded = jwt.verify(token, secret);
         const { id: newID, email: newEmail } = decoded;
 
         const expirationTimestamp = decoded.exp;
-        const currentTimestamp = Math.floor(Date.now() / 1000); // Current time in seconds
-        const threshold = 30; // 30 seconds threshold for refreshing the token
+        const currentTimestamp = Math.floor(Date.now() / 15000); // Current time in seconds
+        const threshold = 5; // 30 seconds threshold for refreshing the token
 
         if (expirationTimestamp - currentTimestamp < threshold) {
             const newToken = jwt.sign({ id: newID, email: newEmail }, secret, { expiresIn: '100s' }); // Expires in 100 seconds
-            res.cookie('token', newToken, { maxAge: 100000, httpOnly: true }); // Set the new token as a cookie (100 seconds)
+            res.cookie('token', newToken, { maxAge: 10000, httpOnly: true }); // Set the new token as a cookie (100 seconds)
             return res.json({ success: true, newToken });
         }
 
@@ -191,6 +193,8 @@ async function verifyToken(req, res) {
         return res.status(401).json({ success: false, msg: "Invalid Token" });
     }
 };
+
+// ########################################################################################################################################################################################################################################################################################################################################################################
 
 async function addProducts(req, res) {
     try{

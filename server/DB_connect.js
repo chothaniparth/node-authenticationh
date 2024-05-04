@@ -11,12 +11,20 @@ const config = {
     }
   };
   
-async function DB_connection() {
+  async function DB_connection() {
     try {
         const result = await sql.connect(config);
         console.log('DB connected');
     } catch (error) {
-        console.log('DB connection error:', error);
+        if (error.code === 'ETIMEOUT') {
+            console.error('Connection timeout:', error);
+        } else if (error.code === 'ELOGIN') {
+            console.error('Authentication failed:', error);
+        } else if (error.code === 'ESERVERNOTFOUND') {
+            console.error('Server not found:', error);
+        } else {
+            console.error('Other error:', error);
+        }
     }
 }
 
